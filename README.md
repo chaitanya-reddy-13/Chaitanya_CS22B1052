@@ -104,9 +104,10 @@ npm i axios @types/axios @tanstack/react-query @tanstack/react-query-devtools re
 feat(fullstack): live ingestion, analytics endpoints, WebSocket stream, React dashboard with Plotly, alerts, CSV import/export; docs + report
 ```
 
-### Report & PDF
-- Full report: `PROJECT_REPORT.md` (includes prompts used)
-- Convert to PDF (VS Code): install "Markdown PDF" → right-click file → Export (pdf)
+### Notes
+- All core features are implemented and functional
+- See `env.example` for configuration options
+- Backend API documentation available at `http://localhost:8000/docs` when running
 
 ### Structure
 ```
