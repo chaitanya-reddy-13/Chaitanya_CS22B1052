@@ -79,8 +79,23 @@ def compute_hedge_ratio(
     if aligned.empty:
         raise ValueError("No overlapping observations between the provided series.")
 
+    # Require minimum data points for reliable regression
+    if len(aligned) < 50:
+        raise ValueError(f"Insufficient data for regression: {len(aligned)} points (need at least 50)")
+
     y = aligned["asset_a"]
     x = aligned["asset_b"]
+
+    # Check for reasonable price ranges (prevent division by zero or extreme values)
+    if y.min() <= 0 or x.min() <= 0:
+        raise ValueError("Price series contains non-positive values")
+    
+    mean_a, mean_b = float(y.mean()), float(x.mean())
+    std_a, std_b = float(y.std()), float(x.std())
+    
+    # Check for reasonable price scales (prevent extreme outliers from corrupting regression)
+    if std_a > mean_a * 10 or std_b > mean_b * 10:
+        raise ValueError("Price series has extreme variance, likely data quality issue")
 
     if include_intercept:
         X = sm.add_constant(x)
@@ -100,22 +115,28 @@ def compute_hedge_ratio(
     pvalue = float(model.pvalues.iloc[1] if include_intercept else model.pvalues.iloc[0])
     stderr = float(model.bse.iloc[1] if include_intercept else model.bse.iloc[0])
 
-    # Validation: Check for suspicious values
-    # If R-squared is very low (< 0.1), the regression fit is poor
-    # If intercept is extremely large relative to prices, there's likely data misalignment
-    mean_price_a = float(y.mean())
-    mean_price_b = float(x.mean())
-    
-    is_suspicious = False
-    if rvalue is not None and rvalue < 0.3:  # Low correlation suggests poor fit
-        is_suspicious = True
-    if intercept is not None and abs(intercept) > abs(mean_price_a) * 10:  # Intercept too large
-        is_suspicious = True
-    if abs(beta) > 1000:  # Hedge ratio is extremely large
-        is_suspicious = True
-    
-    # Note: Negative beta is valid if assets move in opposite directions
-    # But for BTC/ETH pairs, it's unusual and may indicate data issues
+    # Validation: Check for suspicious values and raise warning
+    # For typical BTC/ETH: BTC ~100k, ETH ~3.5k, so beta should be ~28.5 (regressing BTC on ETH)
+    # Or if we regress ETH on BTC: beta ~0.035
+    # But absolute value > 1000 is definitely wrong
+    if abs(beta) > 1000:
+        # If beta is extremely large, the regression is likely wrong
+        # Try the reverse regression as a sanity check
+        if include_intercept:
+            X_reverse = sm.add_constant(y)
+        else:
+            X_reverse = y.to_numpy().reshape(-1, 1)
+        model_reverse = sm.OLS(x, X_reverse).fit()
+        beta_reverse = float(model_reverse.params.iloc[1] if include_intercept else model_reverse.params.iloc[0])
+        
+        # If reverse beta is reasonable, use it (regression direction was wrong)
+        if 0 < abs(beta_reverse) < 1000:
+            # Use 1/beta_reverse as the hedge ratio
+            beta = 1.0 / beta_reverse if beta_reverse != 0 else beta
+            intercept = None if not include_intercept else float(model_reverse.params.iloc[0])
+            rvalue = float(np.sqrt(model_reverse.rsquared)) if model_reverse.rsquared is not None else None
+            pvalue = float(model_reverse.pvalues.iloc[1] if include_intercept else model_reverse.pvalues.iloc[0])
+            stderr = float(model_reverse.bse.iloc[1] if include_intercept else model_reverse.bse.iloc[0])
 
     return HedgeRatioResult(
         beta=beta,
