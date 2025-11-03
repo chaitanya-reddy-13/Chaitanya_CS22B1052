@@ -16,40 +16,46 @@ const PriceChart = ({ primary, secondary, loading }: PriceChartProps) => {
     const traces: Data[] = [];
 
     if (primary?.bars.length) {
-      // Sort bars by timestamp to ensure proper line rendering
-      const sortedPrimary = [...primary.bars].sort((a, b) => 
-        new Date(a.ts).getTime() - new Date(b.ts).getTime()
-      );
-      const primaryTrace: Data = {
-        x: sortedPrimary.map((bar) => new Date(bar.ts)),
-        y: sortedPrimary.map((bar) => bar.close),
-        type: "scatter",
-        mode: "lines+markers",
-        name: primary.symbol.toUpperCase(),
-        line: { color: "#38bdf8", width: 2, simplify: true },
-        marker: { size: 4, opacity: 0.6 },
-        connectgaps: false,
-      };
-      traces.push(primaryTrace);
+      // Sort bars by timestamp and filter out invalid values
+      const sortedPrimary = [...primary.bars]
+        .filter((bar) => bar.close && bar.close > 0 && !isNaN(bar.close))
+        .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+      
+      if (sortedPrimary.length > 0) {
+        const primaryTrace: Data = {
+          x: sortedPrimary.map((bar) => new Date(bar.ts)),
+          y: sortedPrimary.map((bar) => bar.close),
+          type: "scatter",
+          mode: "lines+markers",
+          name: primary.symbol.toUpperCase(),
+          line: { color: "#38bdf8", width: 2, simplify: false },
+          marker: { size: 4, opacity: 0.6 },
+          connectgaps: false,
+        };
+        traces.push(primaryTrace);
+      }
     }
 
     if (secondary?.bars.length) {
-      // Sort bars by timestamp to ensure proper line rendering
-      const sortedSecondary = [...secondary.bars].sort((a, b) => 
-        new Date(a.ts).getTime() - new Date(b.ts).getTime()
-      );
-      const secondaryTrace: Data = {
-        x: sortedSecondary.map((bar) => new Date(bar.ts)),
-        y: sortedSecondary.map((bar) => bar.close),
-        type: "scatter",
-        mode: "lines+markers",
-        name: secondary.symbol.toUpperCase(),
-        line: { color: "#f97316", width: 2, simplify: true },
-        marker: { size: 4, opacity: 0.6 },
-        connectgaps: false,
-        yaxis: "y2",
-      };
-      traces.push(secondaryTrace);
+      // Sort bars by timestamp and filter out invalid values
+      const sortedSecondary = [...secondary.bars]
+        .filter((bar) => bar.close && bar.close > 0 && !isNaN(bar.close))
+        .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+      
+      if (sortedSecondary.length > 0) {
+        const secondaryTrace: Data = {
+          x: sortedSecondary.map((bar) => new Date(bar.ts)),
+          y: sortedSecondary.map((bar) => bar.close),
+          type: "scatter",
+          mode: "lines+markers",
+          name: secondary.symbol.toUpperCase(),
+          line: { color: "#f97316", width: 2, simplify: false },
+          marker: { size: 4, opacity: 0.6 },
+          connectgaps: false,
+          yaxis: "y2",
+        };
+        traces.push(secondaryTrace);
+      }
     }
 
     const layout: Partial<Layout> = {
