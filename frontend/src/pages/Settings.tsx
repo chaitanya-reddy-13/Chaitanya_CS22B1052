@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS: FrontendSettings = {
   defaultWindow: 300,
 };
 
-const SYMBOL_OPTIONS = ["btcusdt", "ethusdt", "bnbusdt", "adausdt", "solusdt", "xrpusdt"];
+const SYMBOL_OPTIONS = ["btcusdt", "ethusdt", "bnbusdt", "adausdt", "solusdt"];
 const TIMEFRAME_OPTIONS = [
   { value: "tick", label: "Tick" },
   { value: "1s", label: "1 Second" },

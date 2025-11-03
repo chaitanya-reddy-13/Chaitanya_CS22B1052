@@ -21,7 +21,7 @@ import {
 } from "@/services/api";
 import type { Alert, AnalyticsResponse, HistoryResponse } from "@/types";
 
-const SYMBOL_CANDIDATES = ["btcusdt", "ethusdt", "bnbusdt", "adausdt"];
+const SYMBOL_CANDIDATES = ["btcusdt", "ethusdt", "bnbusdt", "adausdt", "solusdt"];
 
 const DEFAULT_PAIR = [SYMBOL_CANDIDATES[0], SYMBOL_CANDIDATES[1]] as const;
 
