@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic>=1.10,<3.0
+pydantic-settings>=2.0.0
+pandas
+numpy
+statsmodels
+websockets
+python-multipart
+aiofiles
+
+
+

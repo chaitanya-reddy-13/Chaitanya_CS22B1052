@@ -1,0 +1,148 @@
+"""Core quantitative analytics helpers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import adfuller
+
+
+@dataclass(slots=True)
+class HedgeRatioResult:
+    """Container for hedge ratio regression outputs."""
+
+    beta: float
+    intercept: Optional[float]
+    rvalue: Optional[float]
+    pvalue: Optional[float]
+    stderr: Optional[float]
+
+
+@dataclass(slots=True)
+class ADFResult:
+    """Augmented Dickey-Fuller test summary."""
+
+    statistic: float
+    pvalue: float
+    lags: int
+    nobs: int
+    critical_values: dict[str, float]
+
+
+def _align_series(series_a: pd.Series, series_b: pd.Series) -> pd.DataFrame:
+    """Align two series on the same index and drop missing values."""
+
+    joined = pd.concat([series_a.rename("asset_a"), series_b.rename("asset_b")], axis=1)
+    return joined.dropna(how="any")
+
+
+def compute_hedge_ratio(
+    series_a: pd.Series,
+    series_b: pd.Series,
+    include_intercept: bool = True,
+) -> HedgeRatioResult:
+    """Estimate the hedge ratio beta between two price series via OLS."""
+
+    aligned = _align_series(series_a, series_b)
+    if aligned.empty:
+        raise ValueError("No overlapping observations between the provided series.")
+
+    y = aligned["asset_a"]
+    x = aligned["asset_b"]
+
+    if include_intercept:
+        X = sm.add_constant(x)
+    else:
+        X = x.to_numpy().reshape(-1, 1)
+
+    model = sm.OLS(y, X).fit()
+
+    if include_intercept:
+        intercept = float(model.params.iloc[0])
+        beta = float(model.params.iloc[1])
+    else:
+        intercept = None
+        beta = float(model.params.iloc[0])
+
+    rvalue = float(np.sqrt(model.rsquared)) if model.rsquared is not None else None
+    pvalue = float(model.pvalues.iloc[1] if include_intercept else model.pvalues.iloc[0])
+    stderr = float(model.bse.iloc[1] if include_intercept else model.bse.iloc[0])
+
+    return HedgeRatioResult(
+        beta=beta,
+        intercept=intercept,
+        rvalue=rvalue,
+        pvalue=pvalue,
+        stderr=stderr,
+    )
+
+
+def compute_spread(
+    series_a: pd.Series,
+    series_b: pd.Series,
+    hedge_ratio: HedgeRatioResult,
+) -> pd.Series:
+    """Calculate the spread given the hedge ratio."""
+
+    aligned = _align_series(series_a, series_b)
+    spread = aligned["asset_a"] - hedge_ratio.beta * aligned["asset_b"]
+    if hedge_ratio.intercept is not None:
+        spread -= hedge_ratio.intercept
+    return spread
+
+
+def compute_zscore(spread: pd.Series, window: int) -> pd.Series:
+    """Return the rolling z-score of the spread."""
+
+    if window <= 1:
+        raise ValueError("Rolling window must be greater than 1.")
+
+    # Use min_periods=2 to allow partial calculations with less data
+    min_periods = min(2, window)
+    rolling_mean = spread.rolling(window=window, min_periods=min_periods).mean()
+    rolling_std = spread.rolling(window=window, min_periods=min_periods).std()
+    zscore = (spread - rolling_mean) / rolling_std
+    # Only drop where std is zero (division by zero) or truly NaN
+    return zscore[rolling_std > 0].dropna()
+
+
+def compute_rolling_correlation(
+    series_a: pd.Series,
+    series_b: pd.Series,
+    window: int,
+) -> pd.Series:
+    """Compute rolling Pearson correlation between two series."""
+
+    if window <= 1:
+        raise ValueError("Rolling window must be greater than 1.")
+
+    aligned = _align_series(series_a, series_b)
+    # Use min_periods=2 to allow partial calculations with less data
+    min_periods = min(2, window)
+    return aligned["asset_a"].rolling(window, min_periods=min_periods).corr(aligned["asset_b"])
+
+
+def compute_adf(spread: pd.Series, max_lag: Optional[int] = None) -> ADFResult:
+    """Run an Augmented Dickey-Fuller test on the spread series."""
+
+    clean_spread = spread.dropna()
+    if clean_spread.empty:
+        raise ValueError("Spread series is empty.")
+
+    statistic, pvalue, usedlag, nobs, critical_values, _ = adfuller(
+        clean_spread, maxlag=max_lag, autolag="AIC"
+    )
+
+    return ADFResult(
+        statistic=float(statistic),
+        pvalue=float(pvalue),
+        lags=int(usedlag),
+        nobs=int(nobs),
+        critical_values={str(k): float(v) for k, v in critical_values.items()},
+    )
+
+

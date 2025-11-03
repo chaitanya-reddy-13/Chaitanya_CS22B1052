@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# FastAPI / Backend
+data/*.db
+data/*.csv
+data/*.parquet
+*.db-journal
+
+# Node.js / Frontend
+node_modules/
+dist/
+.next/
+out/
+.npm
+.yarn
+.cache
+.pnp
+.pnp.js
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Project specific
+test_sample_data.csv
+*.ndjson
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+.coverage
+.nyc_output
+coverage/
+
