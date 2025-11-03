@@ -4,7 +4,22 @@ Production-ready, real-time analytics app:
 - FastAPI backend (ingestion, persistence, analytics, alerts, WebSocket)
 - React + Vite + Tailwind frontend (Plotly charts, alerts, CSV upload/export)
 
-### Run (Windows)
+### Quick Start (Single Command)
+
+**Windows PowerShell:**
+```powershell
+.\run.ps1
+```
+
+This single command will:
+- Create virtual environment (if needed)
+- Install backend dependencies (if needed)
+- Install frontend dependencies (if needed)
+- Start backend on `http://localhost:8000`
+- Start frontend on `http://localhost:5173`
+
+**Manual Setup (Alternative):**
+
 1) Backend
 ```powershell
 python -m venv .venv
@@ -19,8 +34,6 @@ cd frontend
 npm install
 npm run dev
 ```
-
-Backend: `http://localhost:8000`  Frontend: `http://localhost:5173`
 
 ### .env (optional)
 Create `.env` in repo root:
