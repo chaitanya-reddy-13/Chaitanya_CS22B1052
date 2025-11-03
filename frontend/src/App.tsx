@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 
 import Alerts from "./pages/Alerts";
 import Dashboard from "./pages/Dashboard";
+import Settings from "./pages/Settings";
 
 const App = () => {
   return (
@@ -25,7 +26,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/alerts" element={<Alerts />} />
-          <Route path="/settings" element={<div>Settings coming soon.</div>} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
