@@ -35,9 +35,27 @@ class ADFResult:
 
 def _align_series(series_a: pd.Series, series_b: pd.Series) -> pd.DataFrame:
     """Align two series on the same index and drop missing values."""
-
-    joined = pd.concat([series_a.rename("asset_a"), series_b.rename("asset_b")], axis=1)
-    return joined.dropna(how="any")
+    
+    # Ensure both series have datetime index for proper alignment
+    if not isinstance(series_a.index, pd.DatetimeIndex):
+        raise ValueError("Series A must have a DatetimeIndex")
+    if not isinstance(series_b.index, pd.DatetimeIndex):
+        raise ValueError("Series B must have a DatetimeIndex")
+    
+    # Resample both to 1 second to ensure better alignment
+    # This handles cases where tick timestamps don't match exactly
+    series_a_resampled = series_a.resample("1s").last().dropna()
+    series_b_resampled = series_b.resample("1s").last().dropna()
+    
+    # Align on the same index and drop missing values
+    joined = pd.concat([series_a_resampled.rename("asset_a"), series_b_resampled.rename("asset_b")], axis=1)
+    aligned = joined.dropna(how="any")
+    
+    # Require minimum overlap for meaningful regression
+    if len(aligned) < 10:
+        raise ValueError(f"Insufficient overlapping data points: {len(aligned)} (need at least 10)")
+    
+    return aligned
 
 
 def compute_hedge_ratio(
@@ -71,6 +89,23 @@ def compute_hedge_ratio(
     rvalue = float(np.sqrt(model.rsquared)) if model.rsquared is not None else None
     pvalue = float(model.pvalues.iloc[1] if include_intercept else model.pvalues.iloc[0])
     stderr = float(model.bse.iloc[1] if include_intercept else model.bse.iloc[0])
+
+    # Validation: Check for suspicious values
+    # If R-squared is very low (< 0.1), the regression fit is poor
+    # If intercept is extremely large relative to prices, there's likely data misalignment
+    mean_price_a = float(y.mean())
+    mean_price_b = float(x.mean())
+    
+    is_suspicious = False
+    if rvalue is not None and rvalue < 0.3:  # Low correlation suggests poor fit
+        is_suspicious = True
+    if intercept is not None and abs(intercept) > abs(mean_price_a) * 10:  # Intercept too large
+        is_suspicious = True
+    if abs(beta) > 1000:  # Hedge ratio is extremely large
+        is_suspicious = True
+    
+    # Note: Negative beta is valid if assets move in opposite directions
+    # But for BTC/ETH pairs, it's unusual and may indicate data issues
 
     return HedgeRatioResult(
         beta=beta,
