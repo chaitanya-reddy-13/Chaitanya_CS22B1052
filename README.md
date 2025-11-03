@@ -1,59 +1,87 @@
-## Binance Analytics Project Skeleton
+## Binance Futures Analytics (FastAPI + React)
 
-This repository contains the initial scaffolding for a full-stack Binance analytics application. It wires up a Python FastAPI backend, a React + Tailwind (Vite) frontend, shared analytics utilities, and helper scripts so you can focus on implementing the real-time ingestion, quantitative analytics, and dashboards.
+Production-ready, real-time analytics app:
+- FastAPI backend (ingestion, persistence, analytics, alerts, WebSocket)
+- React + Vite + Tailwind frontend (Plotly charts, alerts, CSV upload/export)
 
-### What's Included
-- FastAPI app with modular routers (`health`, `data`, `analytics`, `alerts`) and stubs ready for implementation.
-- Binance WebSocket ingestion service with in-memory buffers, async queue, persistence flush worker, and live metrics broadcaster.
-- Analytics helpers for hedge ratio (OLS), spreads, z-score, rolling correlation, and ADF tests wired to REST endpoints.
-- React + Vite + Tailwind frontend with Plotly charts, alert management UI, CSV upload/export, and live metrics via WebSocket.
-- `run_all.ps1` script to launch backend and frontend together on Windows.
-
-### Quick Start
-1. **Backend dependencies**
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   pip install -r backend\requirements.txt
-   ```
-2. **Frontend dependencies**
-   ```powershell
-   cd frontend
-   npm install
-   ```
-3. **Run both services**
-   ```powershell
-   cd ..
-   ./run_all.ps1
-   ```
-   Backend is available at `http://localhost:8000` and frontend at `http://localhost:5173`.
-
-### Project Structure
-```
-backend/        # FastAPI application, ingestion services, analytics modules
-frontend/       # Vite React app with Tailwind styling
-diagrams/       # Architecture diagrams (add draw.io + exported images here)
-tests/          # Test suite placeholder
-run_all.ps1     # Helper script to start backend + frontend concurrently
+### Run (Windows)
+1) Backend
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+uvicorn backend.app.main:create_app --factory --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Next Steps
-- Extend analytics coverage (e.g. Kalman hedge, backtests) and harden alert evaluation logic.
-- Add automated tests for analytics, resampling, and alert triggers under `tests/`.
-- Document architecture decisions and analytics methodology in detail, and add the required diagram exports.
+2) Frontend
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-### API Highlights
-- `GET /api/health` – heartbeat
-- `GET /api/data/history` – tick history → OHLCV bars (1s/1m/5m)
-- `POST /api/data/upload` – ingest OHLC CSVs for analytics
-- `POST /api/analytics/snapshot` – OLS hedge ratio, spread, z-score, rolling correlation, ADF
-- `GET /api/ws/live` – WebSocket stream of live metrics + alert triggers
-- `POST /api/alerts/` – manage alert rules (>, >=, <, <= on spread/zscore/corr/beta)
+Backend: `http://localhost:8000`  Frontend: `http://localhost:5173`
 
-### Notes
-- Tailwind utilities live in `frontend/src/styles/tailwind.css`.
-- Default live metrics stream publishes for the first two configured symbols (tweak `default_symbols` in `backend/core/config.py`).
-- Update the README with environment variables, testing commands, analytics methodology, and ChatGPT usage notes as the project evolves.
+### .env (optional)
+Create `.env` in repo root:
+```env
+APP_NAME=Binance Analytics Backend
+DATA_DIR=data
+SQLITE_PATH=data/ticks.db
+LOG_LEVEL=INFO
+DEFAULT_SYMBOLS=btcusdt,ethusdt
+TICK_BUFFER_SIZE=3600
+DB_FLUSH_INTERVAL_SECONDS=2.0
+DB_BATCH_SIZE=200
+ANALYTICS_WINDOW=300
+```
+
+### Key Endpoints
+- `GET /api/data/history?symbol=btcusdt&timeframe=1s`
+- `POST /api/data/upload` (CSV: timestamp,open,high,low,close,volume)
+- `GET /api/data/export?symbol=btcusdt&timeframe=1s`
+- `POST /api/analytics/snapshot` (pair analytics: β, spread, z, corr, ADF)
+- `GET /api/ws/live` (live metrics stream)
+- `POST /api/alerts` / `PUT /api/alerts/{id}/toggle` / `DELETE /api/alerts/{id}`
+
+### Verify Quickly
+1) Wait ~30s after startup for ticks; charts should populate
+2) Change timeframe (1s/1m) and confirm overlays update
+3) Create an alert (e.g., z-score > 2); observe triggers in panel
+4) Upload `test_sample_data.csv`; see preview rows
+5) Export CSV from current symbol/timeframe
+
+### Troubleshooting
+- TypeScript: install missing deps
+```powershell
+cd frontend
+npm i axios @types/axios @tanstack/react-query @tanstack/react-query-devtools react-plotly.js plotly.js
+```
+- React 18 import issues: use named imports (`StrictMode`, `createRoot`)
+- GeoJSON types: ensure tsconfig types includes only `vite/client`; if needed `npm i -D @types/geojson`
+- Pydantic v2: use `pydantic-settings`; ensure `pydantic-settings>=2`
+- NaN JSON errors: ensure analytics convert NaN/Inf → null (already handled)
+
+### Git Hygiene
+- `.gitignore` includes Python/Node artifacts (`node_modules/`, `.venv/`, `data/`, `__pycache__/`, `.env`, `dist/`)
+- Unstage mistakenly added files: `git reset` (to unstage), then update `.gitignore`
+
+### Commit Message (suggestion)
+```
+feat(fullstack): live ingestion, analytics endpoints, WebSocket stream, React dashboard with Plotly, alerts, CSV import/export; docs + report
+```
+
+### Report & PDF
+- Full report: `PROJECT_REPORT.md` (includes prompts used)
+- Convert to PDF (VS Code): install "Markdown PDF" → right-click file → Export (pdf)
+
+### Structure
+```
+backend/   # FastAPI app, services (ingest, persistence, live, alerts), analytics
+frontend/  # React (Vite, Tailwind, Plotly, React Query)
+diagrams/  # Architecture diagrams
+data/      # SQLite DB and exports
+```
 
 
 
