@@ -42,13 +42,19 @@ def _align_series(series_a: pd.Series, series_b: pd.Series) -> pd.DataFrame:
     if not isinstance(series_b.index, pd.DatetimeIndex):
         raise ValueError("Series B must have a DatetimeIndex")
     
-    # Resample both to 1 second to ensure better alignment
+    # Resample both to 1 second using forward-fill to preserve data
     # This handles cases where tick timestamps don't match exactly
-    series_a_resampled = series_a.resample("1s").last().dropna()
-    series_b_resampled = series_b.resample("1s").last().dropna()
+    # Use forward-fill with a 2-second limit to avoid stale data
+    series_a_resampled = series_a.resample("1s").last()
+    series_b_resampled = series_b.resample("1s").last()
+    
+    # Forward-fill missing values within a short window (2 seconds)
+    # This allows slight timestamp mismatches while avoiding stale data
+    series_a_filled = series_a_resampled.ffill(limit=2)
+    series_b_filled = series_b_resampled.ffill(limit=2)
     
     # Align on the same index and drop missing values
-    joined = pd.concat([series_a_resampled.rename("asset_a"), series_b_resampled.rename("asset_b")], axis=1)
+    joined = pd.concat([series_a_filled.rename("asset_a"), series_b_filled.rename("asset_b")], axis=1)
     aligned = joined.dropna(how="any")
     
     # Require minimum overlap for meaningful regression
