@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 
+import Alerts from "./pages/Alerts";
 import Dashboard from "./pages/Dashboard";
 
 const App = () => {
@@ -23,7 +24,7 @@ const App = () => {
       <main className="mx-auto max-w-6xl px-6 py-8">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/alerts" element={<div>Alerts configuration coming soon.</div>} />
+          <Route path="/alerts" element={<Alerts />} />
           <Route path="/settings" element={<div>Settings coming soon.</div>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
