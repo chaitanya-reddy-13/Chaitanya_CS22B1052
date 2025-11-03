@@ -747,6 +747,16 @@ Core prompts (for a FastAPI/React developer):
 19. "Address pandas FutureWarnings: use '1s' and .iloc; remove positional indexing."
 20. "Write a concise technical report for reviewers familiar with FastAPI/React, focusing on flow, methods, and verification."
 
+### 9b) Alerts & Settings (concise)
+- Settings
+  - `WEBSOCKET_BROADCAST_INTERVAL` (s): cadence for live metrics streaming
+  - `ALERT_EVAL_INTERVAL_SECONDS` (s): how often to evaluate alert rules
+  - `DEFAULT_SYMBOLS`: initial live pair (comma-separated)
+- API Usage
+  - Create: `POST /api/alerts` with { name, symbols[], metric, operator, threshold, window? }
+  - Toggle: `PUT /api/alerts/{id}/toggle` with { active: boolean }
+  - Delete: `DELETE /api/alerts/{id}`
+
 ### 10) Conclusion
 The system delivers a practical real-time analytics stack (ingestion → storage → analytics → streaming → UI) with robust handling of data windows, serialization, and live visualization. It is ready for demos, further research, and extension (e.g., Kalman hedge, backtests, correlation matrices).
 
