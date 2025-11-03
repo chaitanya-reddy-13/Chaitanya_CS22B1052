@@ -34,6 +34,8 @@ TICK_BUFFER_SIZE=3600
 DB_FLUSH_INTERVAL_SECONDS=2.0
 DB_BATCH_SIZE=200
 ANALYTICS_WINDOW=300
+WEBSOCKET_BROADCAST_INTERVAL=0.5
+ALERT_EVAL_INTERVAL_SECONDS=1.0
 ```
 
 ### Key Endpoints
@@ -43,6 +45,37 @@ ANALYTICS_WINDOW=300
 - `POST /api/analytics/snapshot` (pair analytics: β, spread, z, corr, ADF)
 - `GET /api/ws/live` (live metrics stream)
 - `POST /api/alerts` / `PUT /api/alerts/{id}/toggle` / `DELETE /api/alerts/{id}`
+
+### Alerts & Settings
+- Intervals
+  - `WEBSOCKET_BROADCAST_INTERVAL`: seconds between live metric broadcasts (default 0.5)
+  - `ALERT_EVAL_INTERVAL_SECONDS`: alert evaluation cadence (default 1.0)
+- Symbols
+  - `DEFAULT_SYMBOLS`: initial symbols for live ingestion (comma-separated)
+
+Create Alert
+```bash
+curl -X POST http://localhost:8000/api/alerts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "zscore_gt_2",
+    "symbols": ["btcusdt", "ethusdt"],
+    "metric": "zscore",
+    "operator": ">",
+    "threshold": 2,
+    "window": 300
+  }'
+```
+Toggle Alert
+```bash
+curl -X PUT http://localhost:8000/api/alerts/{id}/toggle \
+  -H "Content-Type: application/json" \
+  -d '{"active": true}'
+```
+Delete Alert
+```bash
+curl -X DELETE http://localhost:8000/api/alerts/{id}
+```
 
 ### Verify Quickly
 1) Wait ~30s after startup for ticks; charts should populate
