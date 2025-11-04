@@ -107,15 +107,25 @@ class BinanceIngestService:
         url = f"wss://fstream.binance.com/ws/{symbol}@trade"
         while self._running.is_set():
             try:
-                async with websockets.connect(url) as websocket:
+                # Add timeout to prevent hanging during connection (10 second timeout)
+                websocket = await asyncio.wait_for(
+                    websockets.connect(url, ping_interval=20, ping_timeout=10),
+                    timeout=10.0
+                )
+                async with websocket:
                     LOGGER.info("Connected to %s", url)
                     async for message in websocket:
+                        if not self._running.is_set():
+                            break
                         tick = self._parse_message(symbol, message)
                         if tick is None:
                             continue
                         self.buffer.append(tick)
                         await self.queue.put(tick)
                         await self._broadcast(tick)
+            except asyncio.TimeoutError:
+                LOGGER.warning("WebSocket connection timeout for %s, retrying...", symbol)
+                await asyncio.sleep(self.reconnect_delay)
             except asyncio.CancelledError:
                 LOGGER.debug("WebSocket task for %s cancelled", symbol)
                 break

@@ -80,16 +80,56 @@ async def _prepare_ticks(symbol: str, window: int, timeframe: str) -> List:
 
 
 async def _compute(request: AnalyticsRequest, include_adf: bool) -> AnalyticsResponse:
-    ticks_a = await _prepare_ticks(request.symbol_a, request.window, request.timeframe)
-    ticks_b = await _prepare_ticks(request.symbol_b, request.window, request.timeframe)
-    analytics, _ = compute_pair_metrics(
-        ticks_a,
-        ticks_b,
-        window=request.window,
-        include_intercept=request.include_intercept,
-        adf=include_adf,
-    )
-    return analytics
+    from backend.schemas import HedgeRatioResponse
+    
+    try:
+        ticks_a = await _prepare_ticks(request.symbol_a, request.window, request.timeframe)
+        ticks_b = await _prepare_ticks(request.symbol_b, request.window, request.timeframe)
+    except HTTPException as exc:
+        # If no data available, return empty analytics instead of 404
+        if exc.status_code == 404:
+            return AnalyticsResponse(
+                hedge_ratio=HedgeRatioResponse(
+                    beta=0.0, intercept=0.0, rvalue=None, pvalue=None, stderr=None
+                ),
+                latest_spread=None,
+                latest_zscore=None,
+                rolling_correlation=None,
+                adf=None,
+            )
+        raise
+    except Exception as exc:
+        # Return empty analytics on any other error
+        return AnalyticsResponse(
+            hedge_ratio=HedgeRatioResponse(
+                beta=0.0, intercept=0.0, rvalue=None, pvalue=None, stderr=None
+            ),
+            latest_spread=None,
+            latest_zscore=None,
+            rolling_correlation=None,
+            adf=None,
+        )
+    
+    try:
+        analytics, _ = compute_pair_metrics(
+            ticks_a,
+            ticks_b,
+            window=request.window,
+            include_intercept=request.include_intercept,
+            adf=include_adf,
+        )
+        return analytics
+    except Exception:
+        # Return empty analytics if computation fails (e.g., insufficient data)
+        return AnalyticsResponse(
+            hedge_ratio=HedgeRatioResponse(
+                beta=0.0, intercept=0.0, rvalue=None, pvalue=None, stderr=None
+            ),
+            latest_spread=None,
+            latest_zscore=None,
+            rolling_correlation=None,
+            adf=None,
+        )
 
 
 @router.post("/hedge-ratio", response_model=HedgeRatioResponse)
