@@ -1,5 +1,7 @@
 """FastAPI application entrypoint."""
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,15 +21,43 @@ from backend.storage import init_db
 async def lifespan(app: FastAPI):  # pragma: no cover - integration setup
     init_db()
     ingest_service.add_subscriber(persistence_worker.queue)
-    await ingest_service.start()
-    await persistence_worker.start()
-    await live_metrics_stream.start()
+    
+    # Start services in background without blocking - allow REST API to start even if WebSocket fails
+    # Use asyncio.create_task to start services in background without waiting
+    async def start_services_async():
+        try:
+            await ingest_service.start()
+        except Exception as exc:
+            logging.warning("Ingest service startup failed: %s, continuing anyway...", exc)
+        
+        try:
+            await persistence_worker.start()
+        except Exception as exc:
+            logging.warning("Persistence worker startup failed: %s, continuing anyway...", exc)
+        
+        try:
+            await live_metrics_stream.start()
+        except Exception as exc:
+            logging.warning("Live metrics stream startup failed: %s, continuing anyway...", exc)
+    
+    # Start services in background - don't wait for them
+    asyncio.create_task(start_services_async())
+    
     try:
         yield
     finally:
-        await live_metrics_stream.stop()
-        await persistence_worker.stop()
-        await ingest_service.stop()
+        try:
+            await live_metrics_stream.stop()
+        except Exception:
+            pass
+        try:
+            await persistence_worker.stop()
+        except Exception:
+            pass
+        try:
+            await ingest_service.stop()
+        except Exception:
+            pass
         ingest_service.remove_subscriber(persistence_worker.queue)
 
 
