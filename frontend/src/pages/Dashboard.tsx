@@ -21,7 +21,7 @@ import {
 } from "@/services/api";
 import type { Alert, AnalyticsResponse, HistoryResponse } from "@/types";
 
-const SYMBOL_CANDIDATES = ["btcusdt", "ethusdt", "bnbusdt", "adausdt"];
+const SYMBOL_CANDIDATES = ["btcusdt", "ethusdt", "bnbusdt", "adausdt", "solusdt"];
 
 const DEFAULT_PAIR = [SYMBOL_CANDIDATES[0], SYMBOL_CANDIDATES[1]] as const;
 
@@ -32,10 +32,36 @@ const formatNumber = (value: number | null | undefined, digits = 3) => {
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
-  const [primarySymbol, setPrimarySymbol] = useState(SYMBOL_CANDIDATES[0]);
-  const [secondarySymbol, setSecondarySymbol] = useState(SYMBOL_CANDIDATES[1]);
-  const [timeframe, setTimeframe] = useState("1s");
-  const [window, setWindow] = useState(300);
+  
+  // Load preferences from localStorage
+  const getStoredSettings = () => {
+    const stored = localStorage.getItem("frontend_settings");
+    if (stored) {
+      try {
+        const settings = JSON.parse(stored);
+        return {
+          primarySymbol: settings.defaultPrimarySymbol || SYMBOL_CANDIDATES[0],
+          secondarySymbol: settings.defaultSecondarySymbol || SYMBOL_CANDIDATES[1],
+          timeframe: settings.defaultTimeframe || "1s",
+          window: settings.defaultWindow || 300,
+        };
+      } catch {
+        // Invalid JSON, use defaults
+      }
+    }
+    return {
+      primarySymbol: SYMBOL_CANDIDATES[0],
+      secondarySymbol: SYMBOL_CANDIDATES[1],
+      timeframe: "1s",
+      window: 300,
+    };
+  };
+
+  const stored = getStoredSettings();
+  const [primarySymbol, setPrimarySymbol] = useState(stored.primarySymbol);
+  const [secondarySymbol, setSecondarySymbol] = useState(stored.secondarySymbol);
+  const [timeframe, setTimeframe] = useState(stored.timeframe);
+  const [window, setWindow] = useState(stored.window);
   const [includeIntercept, setIncludeIntercept] = useState(true);
   const [uploadPreview, setUploadPreview] = useState<HistoryResponse | null>(null);
 

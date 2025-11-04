@@ -35,9 +35,37 @@ class ADFResult:
 
 def _align_series(series_a: pd.Series, series_b: pd.Series) -> pd.DataFrame:
     """Align two series on the same index and drop missing values."""
-
-    joined = pd.concat([series_a.rename("asset_a"), series_b.rename("asset_b")], axis=1)
-    return joined.dropna(how="any")
+    
+    # Ensure both series have datetime index for proper alignment
+    if not isinstance(series_a.index, pd.DatetimeIndex):
+        raise ValueError("Series A must have a DatetimeIndex")
+    if not isinstance(series_b.index, pd.DatetimeIndex):
+        raise ValueError("Series B must have a DatetimeIndex")
+    
+    # Convert to DataFrames for merge_asof
+    df_a = series_a.to_frame("asset_a").reset_index()
+    df_b = series_b.to_frame("asset_b").reset_index()
+    
+    # Use merge_asof to align with 1-second tolerance
+    # This matches each timestamp in A with the nearest timestamp in B within 1 second
+    merged = pd.merge_asof(
+        df_a.sort_values("ts"),
+        df_b.sort_values("ts"),
+        on="ts",
+        direction="nearest",
+        tolerance=pd.Timedelta(seconds=1),
+        suffixes=("", "_b")
+    )
+    
+    # Set timestamp as index and drop missing values
+    merged.set_index("ts", inplace=True)
+    aligned = merged[["asset_a", "asset_b"]].dropna(how="any")
+    
+    # Require minimum overlap for meaningful regression
+    if len(aligned) < 10:
+        raise ValueError(f"Insufficient overlapping data points: {len(aligned)} (need at least 10)")
+    
+    return aligned
 
 
 def compute_hedge_ratio(
@@ -51,8 +79,23 @@ def compute_hedge_ratio(
     if aligned.empty:
         raise ValueError("No overlapping observations between the provided series.")
 
+    # Require minimum data points for reliable regression
+    if len(aligned) < 50:
+        raise ValueError(f"Insufficient data for regression: {len(aligned)} points (need at least 50)")
+
     y = aligned["asset_a"]
     x = aligned["asset_b"]
+
+    # Check for reasonable price ranges (prevent division by zero or extreme values)
+    if y.min() <= 0 or x.min() <= 0:
+        raise ValueError("Price series contains non-positive values")
+    
+    mean_a, mean_b = float(y.mean()), float(x.mean())
+    std_a, std_b = float(y.std()), float(x.std())
+    
+    # Check for reasonable price scales (prevent extreme outliers from corrupting regression)
+    if std_a > mean_a * 10 or std_b > mean_b * 10:
+        raise ValueError("Price series has extreme variance, likely data quality issue")
 
     if include_intercept:
         X = sm.add_constant(x)
@@ -71,6 +114,29 @@ def compute_hedge_ratio(
     rvalue = float(np.sqrt(model.rsquared)) if model.rsquared is not None else None
     pvalue = float(model.pvalues.iloc[1] if include_intercept else model.pvalues.iloc[0])
     stderr = float(model.bse.iloc[1] if include_intercept else model.bse.iloc[0])
+
+    # Validation: Check for suspicious values and raise warning
+    # For typical BTC/ETH: BTC ~100k, ETH ~3.5k, so beta should be ~28.5 (regressing BTC on ETH)
+    # Or if we regress ETH on BTC: beta ~0.035
+    # But absolute value > 1000 is definitely wrong
+    if abs(beta) > 1000:
+        # If beta is extremely large, the regression is likely wrong
+        # Try the reverse regression as a sanity check
+        if include_intercept:
+            X_reverse = sm.add_constant(y)
+        else:
+            X_reverse = y.to_numpy().reshape(-1, 1)
+        model_reverse = sm.OLS(x, X_reverse).fit()
+        beta_reverse = float(model_reverse.params.iloc[1] if include_intercept else model_reverse.params.iloc[0])
+        
+        # If reverse beta is reasonable, use it (regression direction was wrong)
+        if 0 < abs(beta_reverse) < 1000:
+            # Use 1/beta_reverse as the hedge ratio
+            beta = 1.0 / beta_reverse if beta_reverse != 0 else beta
+            intercept = None if not include_intercept else float(model_reverse.params.iloc[0])
+            rvalue = float(np.sqrt(model_reverse.rsquared)) if model_reverse.rsquared is not None else None
+            pvalue = float(model_reverse.pvalues.iloc[1] if include_intercept else model_reverse.pvalues.iloc[0])
+            stderr = float(model_reverse.bse.iloc[1] if include_intercept else model_reverse.bse.iloc[0])
 
     return HedgeRatioResult(
         beta=beta,
